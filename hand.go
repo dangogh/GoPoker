@@ -1,4 +1,7 @@
 package poker
+
+import "sort"
+
 type Hand []Card
 
 ////////////////////////////////////////////////////////////////
@@ -16,7 +19,7 @@ func (h Hand) countRanks() map[rune]int {
 func (h Hand) isNOfAKind(n int) bool {
 	isNOfAKind := false
 	for _, c := range h.countRanks() {
-		if c >= n {
+		if c == n {
 			isNOfAKind = true
 			break
 		}
@@ -28,17 +31,20 @@ func (h Hand) isNOfAKind(n int) bool {
 // Exported methods
 // IsStraight returns bool and high card
 func (h Hand) IsStraight() bool {
-	low, high := 999, -1
+	var ranks []int
 	for _, c := range h {
-		val := c.RankIndex()
-		if val < low {
-			low = val
-		}
-		if val > high {
-			high = val
-		}
+		ranks = append(ranks, c.RankIndex())
 	}
-	isStraight := (high - low + 1 == len(h))
+	sort.Ints(ranks)
+	isStraight := true
+	prev, ranks := ranks[0], ranks[1:]
+	for _, r := range ranks {
+		if prev + 1 != r {
+			isStraight = false
+			break
+		}
+		prev = r
+	}
 	return isStraight
 }
 
@@ -82,17 +88,17 @@ func (h Hand) IsFullHouse() bool {
 func (h Hand) IsTwoPair() bool {
 	numPairs := 0
 	for _, count := range h.countRanks() {
-		if count >= 2 {
+		if count == 2 {
 			numPairs++
 		}
 	}
-	return numPairs >= 2
+	return numPairs == 2
 }
 
 func (h Hand) IsThreeOfAKind() bool {
 	return h.isNOfAKind(3)
 }
-func (h Hand) IsTwoOfAKind() bool {
+func (h Hand) IsPair() bool {
 	return h.isNOfAKind(2)
 }
 
