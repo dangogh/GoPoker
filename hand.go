@@ -1,25 +1,74 @@
 package poker
+/*
+In the card game poker, a hand consists of five cards and are ranked, from
+lowest to highest, in the following way:
+
+    High Card: Highest value card.
+    One Pair: Two cards of the same value.
+    Two Pairs: Two different pairs.
+    Three of a Kind: Three cards of the same value.
+    Straight: All cards are consecutive values.
+    Flush: All cards of the same suit.
+    Full House: Three of a kind and a pair.
+    Four of a Kind: Four cards of the same value.
+    Straight Flush: All cards are consecutive values of same suit.
+    Royal Flush: Ten, Jack, Queen, King, Ace, in same suit.
+
+The cards are valued in the order:
+2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King, Ace.
+*/
 
 import "sort"
 
 type Hand []Card
 
+// Hand ranks
+const (
+	HighCard = iota
+	Pair
+	TwoPair
+	ThreeOfAKind
+	Straight
+	Flush
+	FullHouse
+	FourOfAKind
+	StraightFlush
+	RoyalFlush
+      )
+
 ////////////////////////////////////////////////////////////////
 // Helper methods
 // helper method -- return map of ranks to counts
-func (h Hand) countRanks() map[rune]int {
-	ranks := make(map[rune]int)
+func (h Hand) countRanks() map[rune][]Card {
+	ranks := make(map[rune][]Card)
 	for _, c := range h {
-		ranks[c.Rank()]++
+		rank := c.Rank()
+		ranks[rank] = append(ranks[rank], c)
 	}
 	return ranks
+}
+
+// sort cards by significance for the hand type
+func (h Hand) sortCards() {
+	countOf := h.countRanks()
+	for ii := len(h)-1; ii > 0; ii-- {
+		ranksWithCount := make([]rune)
+		for rank,_ := range countOf {
+			ranksWithCount = append(ranksWithCount, rank)
+		}
+		if len(ranksWithCount) > 1 {
+		//add in order	
+		}
+	}
+
+	sort.Ints(ranks)
 }
 
 // helper method -- check if n of same rank
 func (h Hand) isNOfAKind(n int) bool {
 	isNOfAKind := false
-	for _, c := range h.countRanks() {
-		if c == n {
+	for _, ary := range h.countRanks() {
+		if len(ary) == n {
 			isNOfAKind = true
 			break
 		}
@@ -76,8 +125,8 @@ func (h Hand) IsFourOfAKind() bool {
 
 func (h Hand) IsFullHouse() bool {
 	foundTwo, foundThree := false, false
-	for _, count := range h.countRanks() {
-		switch count {
+	for _, ary := range h.countRanks() {
+		switch len(ary) {
 			case 3 : foundThree = true
 			case 2 : foundTwo = true
 		}
@@ -87,8 +136,8 @@ func (h Hand) IsFullHouse() bool {
 
 func (h Hand) IsTwoPair() bool {
 	numPairs := 0
-	for _, count := range h.countRanks() {
-		if count == 2 {
+	for _, ary := range h.countRanks() {
+		if len(ary) == 2 {
 			numPairs++
 		}
 	}
@@ -104,5 +153,47 @@ func (h Hand) IsPair() bool {
 
 func (h Hand) HighCard() Card {
 	return h[0]
+}
+
+func (h Hand) Rank() int {
+	rank := HighCard
+	switch {
+		case h.IsRoyalFlush(): rank = RoyalFlush
+		case h.IsStraightFlush(): rank = StraightFlush
+		case h.IsFourOfAKind(): rank = FourOfAKind
+		case h.IsFullHouse(): rank = FullHouse
+		case h.IsFlush(): rank = Flush
+		case h.IsStraight(): rank = Straight
+		case h.IsThreeOfAKind(): rank = ThreeOfAKind
+		case h.IsTwoPair(): rank = TwoPair
+		case h.IsPair(): rank = Pair
+		default: rank = HighCard
+	}
+	return rank
+}
+
+func (h Hand) Beats(other Hand) bool {
+	rank := h.Rank()
+	otherRank := other.Rank()
+	wins := false
+	switch {
+		case rank > otherRank: wins = true
+		case otherRank > rank: wins = false
+		default: {
+			// else pick highest ranking card
+			for ii := 0; ii < len(h); ii++ {
+				switch {
+				case h[ii].Rank() > other[ii].Rank(): 
+					wins = true
+				case h[ii].Rank() < other[ii].Rank():
+					wins = false
+				default: continue
+				}
+				// determined..
+				break
+			}
+		}
+	}
+	return wins
 }
 
