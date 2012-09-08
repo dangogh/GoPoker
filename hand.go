@@ -49,19 +49,31 @@ func (h Hand) countRanks() map[rune][]Card {
 }
 
 // sort cards by significance for the hand type
-func (h Hand) sortCards() {
-	countOf := h.countRanks()
-	for ii := len(h)-1; ii > 0; ii-- {
-		ranksWithCount := make([]rune)
-		for rank,_ := range countOf {
-			ranksWithCount = append(ranksWithCount, rank)
+func (h Hand) Less(a, b Card) bool {
+	arank, brank := a.RankIndex(), b.RankIndex()
+	retval := true
+	if arank == brank {
+		retval = a.SuitIndex() < b.SuitIndex()
+	} else {
+		// count number of a, b ranks in this hand
+		acount, bcount := 0, 0
+		for _, c := range h {
+			if a.Rank() == c.Rank() {
+				acount++
+			}
+			if b.Rank() == c.Rank() {
+				bcount++
+			}
 		}
-		if len(ranksWithCount) > 1 {
-		//add in order	
+		if acount == bcount {
+			// same -- compare rank
+			retval = arank < brank
+		} else {
+			// pick higher count
+			retval = acount > bcount
 		}
 	}
-
-	sort.Ints(ranks)
+	return retval
 }
 
 // helper method -- check if n of same rank
