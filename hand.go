@@ -20,7 +20,47 @@ The cards are valued in the order:
 
 import "sort"
 
-type Hand []Card
+type Hand struct {
+	cards []Card
+}
+
+// implement sort interface
+func (h Hand) Len() int {
+	return len(h.cards)
+}
+
+// sort cards by significance for the hand type
+func (h Hand) Less(i, j int) bool {
+	a, b := h.cards[i], h.cards[j]
+	arank, brank := a.RankIndex(), b.RankIndex()
+	retval := true
+	if arank == brank {
+		retval = a.SuitIndex() < b.SuitIndex()
+	} else {
+		// count number of a, b ranks in this hand
+		acount, bcount := 0, 0
+		for _, c := range h.cards {
+			if a.Rank() == c.Rank() {
+				acount++
+			}
+			if b.Rank() == c.Rank() {
+				bcount++
+			}
+		}
+		if acount == bcount {
+			// same -- compare rank
+			retval = arank < brank
+		} else {
+			// pick higher count
+			retval = acount > bcount
+		}
+	}
+	return retval
+}
+
+func (h Hand) Swap(i, j int) {
+	h.cards[i], h.cards[j] = h.cards[j], h.cards[i]
+}
 
 // Hand ranks
 const (
@@ -41,40 +81,13 @@ const (
 // helper method -- return map of ranks to counts
 func (h Hand) countRanks() map[rune][]Card {
 	ranks := make(map[rune][]Card)
-	for _, c := range h {
+	for _, c := range h.cards {
 		rank := c.Rank()
 		ranks[rank] = append(ranks[rank], c)
 	}
 	return ranks
 }
 
-// sort cards by significance for the hand type
-func (h Hand) Less(a, b Card) bool {
-	arank, brank := a.RankIndex(), b.RankIndex()
-	retval := true
-	if arank == brank {
-		retval = a.SuitIndex() < b.SuitIndex()
-	} else {
-		// count number of a, b ranks in this hand
-		acount, bcount := 0, 0
-		for _, c := range h {
-			if a.Rank() == c.Rank() {
-				acount++
-			}
-			if b.Rank() == c.Rank() {
-				bcount++
-			}
-		}
-		if acount == bcount {
-			// same -- compare rank
-			retval = arank < brank
-		} else {
-			// pick higher count
-			retval = acount > bcount
-		}
-	}
-	return retval
-}
 
 // helper method -- check if n of same rank
 func (h Hand) isNOfAKind(n int) bool {
@@ -93,7 +106,7 @@ func (h Hand) isNOfAKind(n int) bool {
 // IsStraight returns bool and high card
 func (h Hand) IsStraight() bool {
 	var ranks []int
-	for _, c := range h {
+	for _, c := range h.cards {
 		ranks = append(ranks, c.RankIndex())
 	}
 	sort.Ints(ranks)
@@ -110,10 +123,10 @@ func (h Hand) IsStraight() bool {
 }
 
 func (h Hand) IsFlush() bool {
-	suit := h[0].Suit()
+	suit := h.cards[0].Suit()
 	isFlush := true
 	
-	for _, c := range h {
+	for _, c := range h.cards {
 		val := c.Suit()
 		if val != suit {
 			isFlush = false
@@ -164,7 +177,7 @@ func (h Hand) IsPair() bool {
 }
 
 func (h Hand) HighCard() Card {
-	return h[0]
+	return h.cards[0]
 }
 
 func (h Hand) Rank() int {
@@ -193,11 +206,11 @@ func (h Hand) Beats(other Hand) bool {
 		case otherRank > rank: wins = false
 		default: {
 			// else pick highest ranking card
-			for ii := 0; ii < len(h); ii++ {
+			for ii := 0; ii < len(h.cards); ii++ {
 				switch {
-				case h[ii].Rank() > other[ii].Rank(): 
+				case h.cards[ii].Rank() > other.cards[ii].Rank(): 
 					wins = true
-				case h[ii].Rank() < other[ii].Rank():
+				case h.cards[ii].Rank() < other.cards[ii].Rank():
 					wins = false
 				default: continue
 				}

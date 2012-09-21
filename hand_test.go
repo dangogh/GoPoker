@@ -64,15 +64,16 @@ func testHand(t *testing.T, h Hand, expected, got bool, handType string) {
 
 func TestHands(t *testing.T) {
 	for _, h := range hands {
-		hand := Hand{}
+		var cards []Card
 		for _, c := range h.cards {
 			card, _ := NewCard(c)
-			hand = append(hand, *card)
+			cards = append(cards, *card)
 		}
+		hand := Hand{cards}
 		fmt.Printf("Hand is %v\n", hand)
-		if len(hand) != 5 {
+		if hand.Len() != 5 {
 			t.Errorf("Expected hand length 5, got %d\n",
-					len(hand))
+					hand.Len())
 		}
 		testHand(t, hand, h.pair, hand.IsPair(), "pair")
 		testHand(t, hand, h.twopair, hand.IsTwoPair(), "twopair")
