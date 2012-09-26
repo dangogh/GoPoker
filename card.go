@@ -1,5 +1,8 @@
 package poker
 
+import (
+	"fmt"
+	)
 type Card struct {
 	rank, suit rune
 }
@@ -75,5 +78,5 @@ func (c Card) Suit() rune {
 }
 
 func (c Card) String() string {
-	return string(c.Rank()) + string(c.Suit())
+	return fmt.Sprintf("%c%c", c.Rank(), c.Suit())
 }
