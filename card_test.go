@@ -10,6 +10,7 @@ func TestCard(t *testing.T) {
 	for _, suit := range "CSDH" {
 		for _, rank := range "23456789TJQKA" {
 			c := Card{suit: rune(suit), rank: rune(rank)}
+			fmt.Printf("%s\n", string(c));
 			if c.Rank() != rank || c.Suit() != suit {
 				t.Errorf("Expected KS, got %c%c", c.Rank(), c.Suit())
 			}

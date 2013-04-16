@@ -70,7 +70,7 @@ func TestHands(t *testing.T) {
 			cards = append(cards, *card)
 		}
 		hand := Hand{cards}
-		fmt.Printf("Hand is %v\n", hand)
+		fmt.Printf("Hand is %s\n", hand)
 		if hand.Len() != 5 {
 			t.Errorf("Expected hand length 5, got %d\n",
 					hand.Len())

@@ -18,7 +18,11 @@ The cards are valued in the order:
 2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King, Ace.
 */
 
-import "sort"
+import (
+	"fmt"
+	"sort"	
+	"strings"
+	)
 
 type Hand struct {
 	cards []Card
@@ -222,3 +226,12 @@ func (h Hand) Beats(other Hand) bool {
 	return wins
 }
 
+func (h Hand) String() string {
+	s := make([]string, len(h.cards))
+	for _,c := range h.cards {
+		cs := string(c)
+		s = append(s, string(c))
+		fmt.Printf(" card is %s\n", c)
+	}
+	return strings.Join(s, " ")
+}	
