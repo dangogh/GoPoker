@@ -20,7 +20,6 @@ The cards are valued in the order:
 */
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 )
@@ -67,6 +66,17 @@ func (h Hand) Swap(i, j int) {
 	h.cards[i], h.cards[j] = h.cards[j], h.cards[i]
 }
 
+func (h Hand) String() string {
+	s := make([]string, len(h.cards))
+	for _, c := range h.cards {
+		cs := c.String()
+		//  TODO: why doesn't this work?
+		//     cs := string(c)
+		s = append(s, cs)
+	}
+	return strings.Join(s, " ")
+}
+
 // Hand ranks
 const (
 	HighCard = iota
@@ -84,8 +94,8 @@ const (
 ////////////////////////////////////////////////////////////////
 // Helper methods
 // helper method -- return map of ranks to counts
-func (h Hand) countRanks() map[rune][]Card {
-	ranks := make(map[rune][]Card)
+func (h Hand) countRanks() map[string][]Card {
+	ranks := make(map[string][]Card)
 	for _, c := range h.cards {
 		rank := c.Rank()
 		ranks[rank] = append(ranks[rank], c)
@@ -141,7 +151,7 @@ func (h Hand) IsFlush() bool {
 }
 
 func (h Hand) IsRoyalFlush() bool {
-	return h.HighCard().Rank() == 'A' && h.IsStraightFlush()
+	return h.HighCard().Rank() == "A" && h.IsStraightFlush()
 }
 
 func (h Hand) IsStraightFlush() bool {
@@ -240,14 +250,4 @@ func (h Hand) Beats(other Hand) bool {
 		}
 	}
 	return wins
-}
-
-func (h Hand) String() string {
-	s := make([]string, len(h.cards))
-	for _, c := range h.cards {
-		cs := string(c)
-		s = append(s, string(c))
-		fmt.Printf(" card is %s\n", c)
-	}
-	return strings.Join(s, " ")
 }

@@ -41,7 +41,6 @@ func NewCard(name string) (c *Card, err bool) {
 	}
 	c = new(Card)
 	c.rank, c.suit = rank, suit
-	fmt.Println("NewCard %s\n", name)
 	return c, false
 }
 
@@ -78,7 +77,7 @@ func (c Card) Suit() string {
 	return c.suit
 }
 
-func (c *Card) String() string {
+func (c Card) String() string {
 	s := fmt.Sprintf("%s%s", c.Rank(), c.Suit())
 	return s
 }
