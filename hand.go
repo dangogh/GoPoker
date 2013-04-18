@@ -1,4 +1,5 @@
 package poker
+
 /*
 In the card game poker, a hand consists of five cards and are ranked, from
 lowest to highest, in the following way:
@@ -20,9 +21,9 @@ The cards are valued in the order:
 
 import (
 	"fmt"
-	"sort"	
+	"sort"
 	"strings"
-	)
+)
 
 type Hand struct {
 	cards []Card
@@ -78,7 +79,7 @@ const (
 	FourOfAKind
 	StraightFlush
 	RoyalFlush
-      )
+)
 
 ////////////////////////////////////////////////////////////////
 // Helper methods
@@ -91,7 +92,6 @@ func (h Hand) countRanks() map[rune][]Card {
 	}
 	return ranks
 }
-
 
 // helper method -- check if n of same rank
 func (h Hand) isNOfAKind(n int) bool {
@@ -117,7 +117,7 @@ func (h Hand) IsStraight() bool {
 	isStraight := true
 	prev, ranks := ranks[0], ranks[1:]
 	for _, r := range ranks {
-		if prev + 1 != r {
+		if prev+1 != r {
 			isStraight = false
 			break
 		}
@@ -129,7 +129,7 @@ func (h Hand) IsStraight() bool {
 func (h Hand) IsFlush() bool {
 	suit := h.cards[0].Suit()
 	isFlush := true
-	
+
 	for _, c := range h.cards {
 		val := c.Suit()
 		if val != suit {
@@ -141,7 +141,7 @@ func (h Hand) IsFlush() bool {
 }
 
 func (h Hand) IsRoyalFlush() bool {
-	return h.HighCard().Rank() == 'A' && h.IsStraightFlush() 
+	return h.HighCard().Rank() == 'A' && h.IsStraightFlush()
 }
 
 func (h Hand) IsStraightFlush() bool {
@@ -156,8 +156,10 @@ func (h Hand) IsFullHouse() bool {
 	foundTwo, foundThree := false, false
 	for _, ary := range h.countRanks() {
 		switch len(ary) {
-			case 3 : foundThree = true
-			case 2 : foundTwo = true
+		case 3:
+			foundThree = true
+		case 2:
+			foundTwo = true
 		}
 	}
 	return foundThree && foundTwo
@@ -187,16 +189,26 @@ func (h Hand) HighCard() Card {
 func (h Hand) Rank() int {
 	rank := HighCard
 	switch {
-		case h.IsRoyalFlush(): rank = RoyalFlush
-		case h.IsStraightFlush(): rank = StraightFlush
-		case h.IsFourOfAKind(): rank = FourOfAKind
-		case h.IsFullHouse(): rank = FullHouse
-		case h.IsFlush(): rank = Flush
-		case h.IsStraight(): rank = Straight
-		case h.IsThreeOfAKind(): rank = ThreeOfAKind
-		case h.IsTwoPair(): rank = TwoPair
-		case h.IsPair(): rank = Pair
-		default: rank = HighCard
+	case h.IsRoyalFlush():
+		rank = RoyalFlush
+	case h.IsStraightFlush():
+		rank = StraightFlush
+	case h.IsFourOfAKind():
+		rank = FourOfAKind
+	case h.IsFullHouse():
+		rank = FullHouse
+	case h.IsFlush():
+		rank = Flush
+	case h.IsStraight():
+		rank = Straight
+	case h.IsThreeOfAKind():
+		rank = ThreeOfAKind
+	case h.IsTwoPair():
+		rank = TwoPair
+	case h.IsPair():
+		rank = Pair
+	default:
+		rank = HighCard
 	}
 	return rank
 }
@@ -206,17 +218,21 @@ func (h Hand) Beats(other Hand) bool {
 	otherRank := other.Rank()
 	wins := false
 	switch {
-		case rank > otherRank: wins = true
-		case otherRank > rank: wins = false
-		default: {
+	case rank > otherRank:
+		wins = true
+	case otherRank > rank:
+		wins = false
+	default:
+		{
 			// else pick highest ranking card
 			for ii := 0; ii < len(h.cards); ii++ {
 				switch {
-				case h.cards[ii].Rank() > other.cards[ii].Rank(): 
+				case h.cards[ii].Rank() > other.cards[ii].Rank():
 					wins = true
 				case h.cards[ii].Rank() < other.cards[ii].Rank():
 					wins = false
-				default: continue
+				default:
+					continue
 				}
 				// determined..
 				break
@@ -228,10 +244,10 @@ func (h Hand) Beats(other Hand) bool {
 
 func (h Hand) String() string {
 	s := make([]string, len(h.cards))
-	for _,c := range h.cards {
+	for _, c := range h.cards {
 		cs := string(c)
 		s = append(s, string(c))
 		fmt.Printf(" card is %s\n", c)
 	}
 	return strings.Join(s, " ")
-}	
+}

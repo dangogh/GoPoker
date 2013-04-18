@@ -1,17 +1,16 @@
 package poker
 
 import (
-	"testing"
 	"fmt"
-	)
+	"testing"
+)
 
 func TestCard(t *testing.T) {
 	//c := Card{name: "KS"}
 	for _, suit := range "CSDH" {
 		for _, rank := range "23456789TJQKA" {
-			c := Card{suit: rune(suit), rank: rune(rank)}
-			fmt.Printf("%s\n", string(c));
-			if c.Rank() != rank || c.Suit() != suit {
+			c := Card{suit: string(suit), rank: string(rank)}
+			if c.Rank() != string(rank) || c.Suit() != string(suit) {
 				t.Errorf("Expected KS, got %c%c", c.Rank(), c.Suit())
 			}
 		}
@@ -21,8 +20,8 @@ func TestCard(t *testing.T) {
 func ExampleCard() {
 	for _, suit := range "CSDH" {
 		for _, rank := range "23456789TJQKA" {
-			c := Card{suit: rune(suit), rank: rune(rank)}
-			fmt.Printf("%s\n", c);
+			c := Card{suit: string(suit), rank: string(rank)}
+			fmt.Printf("%s\n", c)
 		}
 	}
 	// Output:

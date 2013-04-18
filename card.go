@@ -1,42 +1,47 @@
 package poker
 
+import (
+	"fmt"
+)
+
 type Card struct {
-	rank, suit rune
+	rank, suit string
 }
 
 var (
 	// string of rank/suit values in increasing value order
 	rankValues, suitValues string
 	// map of rank/suit to index
-	ranks, suits map[rune]int
-    )
+	ranks, suits map[string]int
+)
 
 func init() {
 	rankValues = "23456789TJQKA"
-	ranks = make(map[rune]int, len(rankValues))
+	ranks = make(map[string]int, len(rankValues))
 	for ii, r := range rankValues {
-		ranks[r] = ii
+		ranks[string(r)] = ii
 	}
 	suitValues = "CSDH"
-	suits = make(map[rune]int, len(suitValues))
+	suits = make(map[string]int, len(suitValues))
 	for ii, s := range suitValues {
-		suits[s] = ii
+		suits[string(s)] = ii
 	}
 }
 
 func NewCard(name string) (c *Card, err bool) {
 	// search for suit and rank in letters of name.
 	// Order is not important
-	var rank, suit rune
+	var rank, suit string
 	for _, let := range name {
-		if _, found := ranks[let]; found {
-			rank = let
-		} else if _, found := suits[let]; found {
-			suit = let
+		if _, found := ranks[string(let)]; found {
+			rank = string(let)
+		} else if _, found := suits[string(let)]; found {
+			suit = string(let)
 		}
 	}
 	c = new(Card)
 	c.rank, c.suit = rank, suit
+	fmt.Println("NewCard %s\n", name)
 	return c, false
 }
 
@@ -48,35 +53,32 @@ func (c Card) SuitIndex() int {
 	return suits[c.suit]
 }
 
-
 // Class methods
-func Suits() []rune {
-	var suitAry []rune
+func Suits() []string {
+	var suitAry []string
 	for _, suit := range suitValues {
-		suitAry = append(suitAry, suit)
+		suitAry = append(suitAry, string(suit))
 	}
 	return suitAry
 }
 
-func Ranks() []rune {
-	var rankAry []rune
+func Ranks() []string {
+	var rankAry []string
 	for _, rank := range rankValues {
-		rankAry = append(rankAry, rank)
+		rankAry = append(rankAry, string(rank))
 	}
 	return rankAry
 }
 
-func (c Card) Rank() rune {
+func (c Card) Rank() string {
 	return c.rank
 }
 
-func (c Card) Suit() rune {
+func (c Card) Suit() string {
 	return c.suit
 }
 
 func (c *Card) String() string {
-	runes := make([]rune, 2)
-	runes[0] = c.Rank()
-	runes[1] = c.Suit()
-	return string(runes)
+	s := fmt.Sprintf("%s%s", c.Rank(), c.Suit())
+	return s
 }
