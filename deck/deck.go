@@ -3,7 +3,6 @@ package deck
 import (
 	"fmt"
 	"math/rand"
-	"time"
 
 	"github.com/dangogh/GoPoker/cards"
 )
@@ -23,7 +22,6 @@ func NewDeck() *Deck {
 }
 
 func (d *Deck) Shuffle() {
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(d.cards), func(i, j int) {
 		d.cards[i], d.cards[j] = d.cards[j], d.cards[i]
 	})
