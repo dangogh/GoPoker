@@ -171,6 +171,74 @@ func Evaluate(h Hand) EvaluatedHand {
 	}
 }
 
+// RecommendDiscards returns the indices of cards to discard (0-based) up to maxDiscard.
+// Strategy (conservative heuristic):
+// - Keep any cards that are part of a pair/trips/quads.
+// - If no meaningful groups, keep the top two cards by rank and discard low singletons.
+// - If the hand is already a straight/flush/strong made hand, recommend no discards.
+func RecommendDiscards(h Hand, maxDiscard int) []int {
+	if maxDiscard <= 0 {
+		return nil
+	}
+	if len(h.Cards) == 0 {
+		return nil
+	}
+
+	// If hand already strong (made hand), don't discard
+	e := Evaluate(h)
+	// replaced long if with a switch for clarity
+	switch e.Category {
+	case Straight, Flush, StraightFlush, FullHouse, FourOfKind, ThreeOfKind, TwoPair:
+		return nil
+	}
+
+	// Count ranks and mark keepers for ranks that appear >= 2
+	rankCount := map[cards.Rank]int{}
+	for _, c := range h.Cards {
+		rankCount[c.Rank]++
+	}
+	keep := make([]bool, len(h.Cards))
+	for i, c := range h.Cards {
+		if rankCount[c.Rank] >= 2 {
+			keep[i] = true
+		}
+	}
+
+	// Keep the top two high cards if not already part of a group
+	idxs := make([]int, len(h.Cards))
+	for i := range idxs {
+		idxs[i] = i
+	}
+	sort.Slice(idxs, func(i, j int) bool {
+		return h.Cards[idxs[i]].Rank > h.Cards[idxs[j]].Rank
+	})
+	// Ensure top two are kept (helps draws toward high-card / pair possibilities)
+	if !keep[idxs[0]] {
+		keep[idxs[0]] = true
+	}
+	if len(idxs) > 1 && !keep[idxs[1]] {
+		keep[idxs[1]] = true
+	}
+
+	// Collect discard indices (those not kept)
+	discards := make([]int, 0, 3)
+	for i := range h.Cards {
+		if !keep[i] {
+			discards = append(discards, i)
+		}
+	}
+
+	// If more discards than allowed, prefer discarding the lowest ranks first
+	if len(discards) > maxDiscard {
+		sort.Slice(discards, func(i, j int) bool {
+			return h.Cards[discards[i]].Rank < h.Cards[discards[j]].Rank
+		})
+		discards = discards[:maxDiscard]
+	}
+
+	return discards
+}
+
 // Compare compares two evaluated hands. Returns 1 if a > b, -1 if a < b, 0 if equal.
 func Compare(a, b EvaluatedHand) int {
 	if a.Category != b.Category {
