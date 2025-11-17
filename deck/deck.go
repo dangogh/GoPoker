@@ -40,3 +40,31 @@ func (d *Deck) Deal(n int) ([]cards.Card, error) {
 	d.cards = d.cards[n:]
 	return hand, nil
 }
+
+// RemoveCards removes the first occurrence of each card in toRemove from the deck's remaining cards.
+// It returns the number of cards actually removed.
+// Implementation: single-pass filtering using a frequency map and in-place slice reuse for efficiency.
+func (d *Deck) RemoveCards(toRemove []cards.Card) int {
+	if len(toRemove) == 0 || len(d.cards) == 0 {
+		return 0
+	}
+
+	need := make(map[cards.Card]int, len(toRemove))
+	for _, c := range toRemove {
+		need[c]++
+	}
+
+	removed := 0
+	// reuse underlying array to avoid extra allocation
+	out := d.cards[:0]
+	for _, c := range d.cards {
+		if need[c] > 0 {
+			need[c]--
+			removed++
+			continue
+		}
+		out = append(out, c)
+	}
+	d.cards = out
+	return removed
+}
