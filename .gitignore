@@ -1,0 +1,47 @@
+# Binaries
+/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Build/coverage artifacts
+coverage.out
+coverage.html
+*.coverprofile
+*.prof
+
+# Go workspace and modules
+*.modcache/
+*.cache
+*.tmp
+
+# Dependency directories
+vendor/
+node_modules/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# Editor temporary files
+*.swp
+*~
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and env
+*.log
+.env
+
+# Misc
+coverage/
+dist/
