@@ -10,6 +10,18 @@ import (
 
 func mk(cs ...cards.Card) Hand { return Hand{Cards: cs} }
 
+// cardStrings converts card indices to their string representation for assertion messages.
+func cardStrings(hand Hand, indices []int) []string {
+	if indices == nil {
+		return nil
+	}
+	strs := make([]string, len(indices))
+	for i, idx := range indices {
+		strs[i] = hand.Cards[idx].String()
+	}
+	return strs
+}
+
 func TestEvaluateCategories(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -212,11 +224,11 @@ func TestRecommendDiscards_Table(t *testing.T) {
 		{
 			name: "StrongMade_NoDiscard (FullHouse)",
 			hand: mk(
-				cards.NewCard(cards.Clubs, cards.Three),
-				cards.NewCard(cards.Diamonds, cards.Three),
-				cards.NewCard(cards.Hearts, cards.Three),
-				cards.NewCard(cards.Spades, cards.Two),
-				cards.NewCard(cards.Clubs, cards.Two),
+				cards.NewCard(cards.Spades, cards.Two),     // keep
+				cards.NewCard(cards.Clubs, cards.Three),    // keep
+				cards.NewCard(cards.Diamonds, cards.Three), // keep
+				cards.NewCard(cards.Clubs, cards.Two),      // keep
+				cards.NewCard(cards.Hearts, cards.Three),   // keep
 			),
 			maxDisc:  3,
 			expected: nil,
@@ -224,74 +236,110 @@ func TestRecommendDiscards_Table(t *testing.T) {
 		{
 			name: "FourToFlush_DiscardOne",
 			hand: mk(
-				cards.NewCard(cards.Hearts, cards.Two),   // 0 keep
-				cards.NewCard(cards.Hearts, cards.Five),  // 1 keep
-				cards.NewCard(cards.Hearts, cards.Seven), // 2 keep
-				cards.NewCard(cards.Hearts, cards.King),  // 3 keep
-				cards.NewCard(cards.Spades, cards.Three), // 4 discard
+				cards.NewCard(cards.Spades, cards.Three), // discard
+				cards.NewCard(cards.Hearts, cards.Seven), // keep
+				cards.NewCard(cards.Hearts, cards.Two),   // keep
+				cards.NewCard(cards.Hearts, cards.King),  // keep
+				cards.NewCard(cards.Hearts, cards.Five),  // keep
 			),
 			maxDisc:  3,
-			expected: []int{4},
+			expected: []int{0},
 		},
 		{
 			name: "FourToStraight_DiscardOne",
 			hand: mk(
-				cards.NewCard(cards.Clubs, cards.Five),   // 0 keep
-				cards.NewCard(cards.Diamonds, cards.Six), // 1 keep
-				cards.NewCard(cards.Hearts, cards.Seven), // 2 keep
-				cards.NewCard(cards.Spades, cards.Eight), // 3 keep
-				cards.NewCard(cards.Clubs, cards.Two),    // 4 discard
+				cards.NewCard(cards.Clubs, cards.Two),    // discard
+				cards.NewCard(cards.Hearts, cards.Seven), // keep
+				cards.NewCard(cards.Clubs, cards.Five),   // keep
+				cards.NewCard(cards.Diamonds, cards.Six), // keep
+				cards.NewCard(cards.Spades, cards.Eight), // keep
 			),
 			maxDisc:  3,
-			expected: []int{4},
+			expected: []int{0},
 		},
 		{
 			name: "ThreeOfKind_DiscardTwo",
 			hand: mk(
-				cards.NewCard(cards.Clubs, cards.Seven),    // 0 trip
-				cards.NewCard(cards.Diamonds, cards.Seven), // 1 trip
-				cards.NewCard(cards.Hearts, cards.Seven),   // 2 trip
-				cards.NewCard(cards.Spades, cards.King),    // 3 discard
-				cards.NewCard(cards.Clubs, cards.Queen),    // 4 discard
+				cards.NewCard(cards.Spades, cards.King),    // discard
+				cards.NewCard(cards.Clubs, cards.Seven),    // keep
+				cards.NewCard(cards.Clubs, cards.Queen),    // discard
+				cards.NewCard(cards.Diamonds, cards.Seven), // keep
+				cards.NewCard(cards.Hearts, cards.Seven),   // keep
 			),
 			maxDisc:  3,
-			expected: []int{3, 4},
+			expected: []int{0, 2},
 		},
 		{
 			name: "TwoPair_DiscardKicker",
 			hand: mk(
-				cards.NewCard(cards.Clubs, cards.King),    // 0 pair
-				cards.NewCard(cards.Diamonds, cards.King), // 1 pair
-				cards.NewCard(cards.Hearts, cards.Nine),   // 2 pair
-				cards.NewCard(cards.Spades, cards.Nine),   // 3 pair
-				cards.NewCard(cards.Clubs, cards.Five),    // 4 kicker -> discard
+				cards.NewCard(cards.Clubs, cards.Five),    // discard kicker
+				cards.NewCard(cards.Diamonds, cards.King), // keep
+				cards.NewCard(cards.Hearts, cards.Nine),   // keep
+				cards.NewCard(cards.Clubs, cards.King),    // keep
+				cards.NewCard(cards.Spades, cards.Nine),   // keep
 			),
 			maxDisc:  3,
-			expected: []int{4},
+			expected: []int{0},
 		},
 		{
 			name: "OnePair_DiscardThree",
 			hand: mk(
-				cards.NewCard(cards.Clubs, cards.Jack),    // 0 pair
-				cards.NewCard(cards.Diamonds, cards.Jack), // 1 pair
-				cards.NewCard(cards.Hearts, cards.Ace),    // 2 discard
-				cards.NewCard(cards.Spades, cards.King),   // 3 discard
-				cards.NewCard(cards.Clubs, cards.Two),     // 4 discard
+				cards.NewCard(cards.Hearts, cards.Ace),    // discard
+				cards.NewCard(cards.Clubs, cards.Jack),    // keep
+				cards.NewCard(cards.Clubs, cards.Two),     // discard
+				cards.NewCard(cards.Diamonds, cards.Jack), // keep
+				cards.NewCard(cards.Spades, cards.King),   // discard
 			),
 			maxDisc:  3,
-			expected: []int{2, 3, 4},
+			expected: []int{0, 2, 4},
 		},
 		{
-			name: "HighCard_DiscardUpToMax",
+			name: "FourToBabyStraight_DiscardOne",
 			hand: mk(
-				cards.NewCard(cards.Clubs, cards.Two),      // 0 discard
-				cards.NewCard(cards.Diamonds, cards.Three), // 1 discard
-				cards.NewCard(cards.Hearts, cards.Four),    // 2 discard
-				cards.NewCard(cards.Clubs, cards.Nine),     // 3 keep
-				cards.NewCard(cards.Spades, cards.Ace),     // 4 keep (highest)
+				cards.NewCard(cards.Clubs, cards.Nine),     // discard
+				cards.NewCard(cards.Spades, cards.Ace),     // wheel keep
+				cards.NewCard(cards.Clubs, cards.Two),      // wheel keep
+				cards.NewCard(cards.Diamonds, cards.Three), // wheel keep
+				cards.NewCard(cards.Hearts, cards.Four),    // wheel keep
 			),
 			maxDisc:  3,
-			expected: []int{0, 1, 2},
+			expected: []int{0},
+		},
+		{
+			name: "ComputeMaxDiscard_HighCardWithAce",
+			hand: mk(
+				cards.NewCard(cards.Diamonds, cards.King), // discard
+				cards.NewCard(cards.Spades, cards.Five),   // discard
+				cards.NewCard(cards.Clubs, cards.Ace),     // keep (highest)
+				cards.NewCard(cards.Clubs, cards.Two),     // discard
+				cards.NewCard(cards.Hearts, cards.Nine),   // discard
+			),
+			maxDisc: ComputeMaxDiscard(mk(
+				cards.NewCard(cards.Diamonds, cards.King),
+				cards.NewCard(cards.Spades, cards.Five),
+				cards.NewCard(cards.Clubs, cards.Ace),
+				cards.NewCard(cards.Clubs, cards.Two),
+				cards.NewCard(cards.Hearts, cards.Nine),
+			)),
+			expected: []int{0, 1, 3, 4},
+		},
+		{
+			name: "ComputeMaxDiscard_HighCardWithoutAce",
+			hand: mk(
+				cards.NewCard(cards.Hearts, cards.Nine),    // discard
+				cards.NewCard(cards.Clubs, cards.King),     // keep (highest)
+				cards.NewCard(cards.Clubs, cards.Two),      // discard (lowest)
+				cards.NewCard(cards.Diamonds, cards.Queen), // keep (2nd highest)
+				cards.NewCard(cards.Spades, cards.Five),    // discard
+			),
+			maxDisc: ComputeMaxDiscard(mk(
+				cards.NewCard(cards.Hearts, cards.Nine),
+				cards.NewCard(cards.Clubs, cards.King),
+				cards.NewCard(cards.Clubs, cards.Two),
+				cards.NewCard(cards.Diamonds, cards.Queen),
+				cards.NewCard(cards.Spades, cards.Five),
+			)),
+			expected: []int{0, 2, 4},
 		},
 	}
 
@@ -301,8 +349,18 @@ func TestRecommendDiscards_Table(t *testing.T) {
 			if tc.expected == nil {
 				assert.Nil(t, got, "%s: expected no discards", tc.name)
 			} else {
-				assert.ElementsMatch(t, tc.expected, got, "%s: unexpected discard indices", tc.name)
+				// assert.ElementsMatch(t, tc.expected, got, "%s: unexpected discard indices", tc.name)
 				assert.LessOrEqual(t, len(got), tc.maxDisc, "%s: exceeded maxDiscard", tc.name)
+				// Show card strings for clear failure messages
+				expectedCards := make([]string, len(tc.expected))
+				for i, idx := range tc.expected {
+					expectedCards[i] = tc.hand.Cards[idx].String()
+				}
+				gotCards := make([]string, len(got))
+				for i, idx := range got {
+					gotCards[i] = tc.hand.Cards[idx].String()
+				}
+				assert.ElementsMatch(t, expectedCards, gotCards, "%s: discarded cards mismatch", tc.name)
 			}
 		})
 	}

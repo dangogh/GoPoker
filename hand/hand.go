@@ -171,6 +171,26 @@ func Evaluate(h Hand) EvaluatedHand {
 	}
 }
 
+// ComputeMaxDiscard determines the maximum cards that can be discarded based on 5-card draw rules:
+// - If the highest card to keep is an Ace, allow up to 4 discards (draw 4 cards).
+// - Otherwise, allow up to 3 discards (standard 5-card draw max).
+func ComputeMaxDiscard(h Hand) int {
+	if len(h.Cards) == 0 {
+		return 3
+	}
+	// Find highest rank
+	highest := h.Cards[0].Rank
+	for _, c := range h.Cards {
+		if c.Rank > highest {
+			highest = c.Rank
+		}
+	}
+	if highest == cards.Ace {
+		return 4
+	}
+	return 3
+}
+
 // RecommendDiscards returns the indices of cards to discard (0-based) up to maxDiscard.
 // Aggressive strategy:
 // - Do not break strong made hands (straight, flush, straight flush, full house, four of a kind).

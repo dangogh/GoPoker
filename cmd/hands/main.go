@@ -39,6 +39,7 @@ func categoryName(c hand.Category) string {
 // performDraw takes current cards, asks hand.RecommendDiscards for up to maxDiscard indices,
 // draws replacements from the deck and returns the updated cards, the cards that were discarded,
 // and the cards that were drawn.
+// maxDiscard is computed based on 5-card draw rules: if Ace is kept, allow 4 discards; else 3.
 func performDraw(d *deck.Deck, cs []cards.Card, maxDiscard int) ([]cards.Card, []cards.Card, []cards.Card, error) {
 	discardIdxs := hand.RecommendDiscards(hand.Hand{Cards: cs}, maxDiscard)
 	if len(discardIdxs) == 0 {
@@ -107,7 +108,10 @@ func main() {
 
 	// Draw phase for each player
 	for i := 0; i < *players; i++ {
-		cs, discarded, drew, err := performDraw(d, hands[i], 3)
+		// Compute max discard based on 5-card draw rules
+		maxDisc := hand.ComputeMaxDiscard(hand.Hand{Cards: hands[i]})
+
+		cs, discarded, drew, err := performDraw(d, hands[i], maxDisc)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "draw error:", err)
 			return
