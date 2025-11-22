@@ -172,39 +172,203 @@ func Evaluate(h Hand) EvaluatedHand {
 }
 
 // RecommendDiscards returns the indices of cards to discard (0-based) up to maxDiscard.
-// Strategy (conservative heuristic):
-// - Keep any cards that are part of a pair/trips/quads.
-// - If no meaningful groups, keep the top two cards by rank and discard low singletons.
-// - If the hand is already a straight/flush/strong made hand, recommend no discards.
+// Aggressive strategy:
+// - Do not break strong made hands (straight, flush, straight flush, full house, four of a kind).
+// - If 4-to-a-flush exists, keep those 4 and discard the other card.
+// - If 4-to-a-straight exists, keep those 4 and discard the other card.
+// - For three-of-a-kind: keep the trips, discard other 2.
+// - For two-pair: keep pairs, discard kicker (1).
+// - For one-pair: keep the pair, discard 3 (aggressive).
+// - For high-card hands: keep only the top card, discard up to maxDiscard (aggressive).
 func RecommendDiscards(h Hand, maxDiscard int) []int {
-	if maxDiscard <= 0 {
-		return nil
-	}
-	if len(h.Cards) == 0 {
+	if maxDiscard <= 0 || len(h.Cards) == 0 {
 		return nil
 	}
 
 	// If hand already strong (made hand), don't discard
 	e := Evaluate(h)
-	// replaced long if with a switch for clarity
 	switch e.Category {
-	case Straight, Flush, StraightFlush, FullHouse, FourOfKind, ThreeOfKind, TwoPair:
+	case StraightFlush, FourOfKind, FullHouse, Straight, Flush:
 		return nil
 	}
 
-	// Count ranks and mark keepers for ranks that appear >= 2
+	// Build counts and helper maps
 	rankCount := map[cards.Rank]int{}
-	for _, c := range h.Cards {
-		rankCount[c.Rank]++
-	}
-	keep := make([]bool, len(h.Cards))
+	suitCount := map[cards.Suit]int{}
+	rankIdxs := map[cards.Rank][]int{}
+	suitIdxs := map[cards.Suit][]int{}
 	for i, c := range h.Cards {
-		if rankCount[c.Rank] >= 2 {
-			keep[i] = true
+		rankCount[c.Rank]++
+		suitCount[c.Suit]++
+		rankIdxs[c.Rank] = append(rankIdxs[c.Rank], i)
+		suitIdxs[c.Suit] = append(suitIdxs[c.Suit], i)
+	}
+
+	// Helper: collect all unique ranks and a set for quick lookup (handle Ace as low for sequences)
+	rankSet := map[int]bool{}
+	for r := range rankCount {
+		rankSet[int(r)] = true
+		if r == cards.Ace {
+			rankSet[1] = true // ace as low for wheel detection
 		}
 	}
 
-	// Keep the top two high cards if not already part of a group
+	// Detect 4-to-a-flush
+	for s, cnt := range suitCount {
+		if cnt == 4 {
+			keep := make([]bool, len(h.Cards))
+			for _, idx := range suitIdxs[s] {
+				keep[idx] = true
+			}
+			discards := make([]int, 0, 3)
+			for i := range h.Cards {
+				if !keep[i] {
+					discards = append(discards, i)
+				}
+			}
+			if len(discards) > maxDiscard {
+				sort.Slice(discards, func(i, j int) bool {
+					return h.Cards[discards[i]].Rank < h.Cards[discards[j]].Rank
+				})
+				discards = discards[:maxDiscard]
+			}
+			return discards
+		}
+	}
+
+	// Detect 4-to-a-straight (look for any sequence of 4 consecutive ranks)
+	if len(rankSet) >= 4 {
+		uniqueVals := make([]int, 0, len(rankSet))
+		for v := range rankSet {
+			uniqueVals = append(uniqueVals, v)
+		}
+		sort.Ints(uniqueVals)
+
+		runStart := -1
+		runLen := 0
+		bestRun := []int{}
+		for i := 0; i < len(uniqueVals); i++ {
+			if i == 0 || uniqueVals[i] == uniqueVals[i-1]+1 {
+				if runLen == 0 {
+					runStart = uniqueVals[i]
+				}
+				runLen++
+			} else {
+				if runLen >= 4 {
+					curr := make([]int, 0, runLen)
+					for v := runStart; v < runStart+runLen; v++ {
+						curr = append(curr, v)
+					}
+					bestRun = curr
+					break
+				}
+				runLen = 1
+				runStart = uniqueVals[i]
+			}
+		}
+		if runLen >= 4 && len(bestRun) == 0 {
+			curr := make([]int, 0, runLen)
+			for v := runStart; v < runStart+runLen; v++ {
+				curr = append(curr, v)
+			}
+			bestRun = curr
+		}
+		if len(bestRun) >= 4 {
+			keep := make([]bool, len(h.Cards))
+			for i, c := range h.Cards {
+				rv := int(c.Rank)
+				if rv == 14 && containsInt(bestRun, 1) { // Ace counted as 1 in run
+					keep[i] = true
+					continue
+				}
+				if containsInt(bestRun, rv) {
+					keep[i] = true
+				}
+			}
+			discards := make([]int, 0, 3)
+			for i := range h.Cards {
+				if !keep[i] {
+					discards = append(discards, i)
+				}
+			}
+			if len(discards) > maxDiscard {
+				sort.Slice(discards, func(i, j int) bool {
+					return h.Cards[discards[i]].Rank < h.Cards[discards[j]].Rank
+				})
+				discards = discards[:maxDiscard]
+			}
+			return discards
+		}
+	}
+
+	// Three of a kind -> discard other two
+	for r, cnt := range rankCount {
+		if cnt == 3 {
+			discards := make([]int, 0, 2)
+			for i, c := range h.Cards {
+				if c.Rank != r {
+					discards = append(discards, i)
+				}
+			}
+			if len(discards) > maxDiscard {
+				sort.Slice(discards, func(i, j int) bool {
+					return h.Cards[discards[i]].Rank < h.Cards[discards[j]].Rank
+				})
+				discards = discards[:maxDiscard]
+			}
+			return discards
+		}
+	}
+
+	// Two pair -> discard kicker
+	pairRanks := make([]cards.Rank, 0, 2)
+	for r, cnt := range rankCount {
+		if cnt == 2 {
+			pairRanks = append(pairRanks, r)
+		}
+	}
+	if len(pairRanks) == 2 {
+		keep := make([]bool, len(h.Cards))
+		for _, pr := range pairRanks {
+			for _, idx := range rankIdxs[pr] {
+				keep[idx] = true
+			}
+		}
+		discards := make([]int, 0, 1)
+		for i := range h.Cards {
+			if !keep[i] {
+				discards = append(discards, i)
+			}
+		}
+		if len(discards) > maxDiscard {
+			discards = discards[:maxDiscard]
+		}
+		return discards
+	}
+
+	// One pair -> discard three
+	if len(pairRanks) == 1 {
+		pr := pairRanks[0]
+		keep := make([]bool, len(h.Cards))
+		for _, idx := range rankIdxs[pr] {
+			keep[idx] = true
+		}
+		discards := make([]int, 0, 3)
+		for i := range h.Cards {
+			if !keep[i] {
+				discards = append(discards, i)
+			}
+		}
+		if len(discards) > maxDiscard {
+			sort.Slice(discards, func(i, j int) bool {
+				return h.Cards[discards[i]].Rank < h.Cards[discards[j]].Rank
+			})
+			discards = discards[:maxDiscard]
+		}
+		return discards
+	}
+
+	// High card: keep only the top card, discard up to maxDiscard
 	idxs := make([]int, len(h.Cards))
 	for i := range idxs {
 		idxs[i] = i
@@ -212,31 +376,31 @@ func RecommendDiscards(h Hand, maxDiscard int) []int {
 	sort.Slice(idxs, func(i, j int) bool {
 		return h.Cards[idxs[i]].Rank > h.Cards[idxs[j]].Rank
 	})
-	// Ensure top two are kept (helps draws toward high-card / pair possibilities)
-	if !keep[idxs[0]] {
-		keep[idxs[0]] = true
-	}
-	if len(idxs) > 1 && !keep[idxs[1]] {
-		keep[idxs[1]] = true
-	}
-
-	// Collect discard indices (those not kept)
-	discards := make([]int, 0, 3)
+	keep := make([]bool, len(h.Cards))
+	keep[idxs[0]] = true // keep top card only
+	discards := make([]int, 0, len(h.Cards)-1)
 	for i := range h.Cards {
 		if !keep[i] {
 			discards = append(discards, i)
 		}
 	}
-
-	// If more discards than allowed, prefer discarding the lowest ranks first
+	sort.Slice(discards, func(i, j int) bool {
+		return h.Cards[discards[i]].Rank < h.Cards[discards[j]].Rank
+	})
 	if len(discards) > maxDiscard {
-		sort.Slice(discards, func(i, j int) bool {
-			return h.Cards[discards[i]].Rank < h.Cards[discards[j]].Rank
-		})
 		discards = discards[:maxDiscard]
 	}
-
 	return discards
+}
+
+// helper to check presence in int slice
+func containsInt(a []int, v int) bool {
+	for _, x := range a {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }
 
 // Compare compares two evaluated hands. Returns 1 if a > b, -1 if a < b, 0 if equal.
