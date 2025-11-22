@@ -201,3 +201,109 @@ func TestCompareBasics(t *testing.T) {
 	assert.Equal(t, 0, Compare(h1, h2), "identical high-card hands should tie")
 	assert.Equal(t, 0, Compare(h2, h1), "symmetry: tie both ways")
 }
+
+func TestRecommendDiscards_Table(t *testing.T) {
+	tests := []struct {
+		name     string
+		hand     Hand
+		maxDisc  int
+		expected []int // expected discard indices (order ignored)
+	}{
+		{
+			name: "StrongMade_NoDiscard (FullHouse)",
+			hand: mk(
+				cards.NewCard(cards.Clubs, cards.Three),
+				cards.NewCard(cards.Diamonds, cards.Three),
+				cards.NewCard(cards.Hearts, cards.Three),
+				cards.NewCard(cards.Spades, cards.Two),
+				cards.NewCard(cards.Clubs, cards.Two),
+			),
+			maxDisc:  3,
+			expected: nil,
+		},
+		{
+			name: "FourToFlush_DiscardOne",
+			hand: mk(
+				cards.NewCard(cards.Hearts, cards.Two),   // 0 keep
+				cards.NewCard(cards.Hearts, cards.Five),  // 1 keep
+				cards.NewCard(cards.Hearts, cards.Seven), // 2 keep
+				cards.NewCard(cards.Hearts, cards.King),  // 3 keep
+				cards.NewCard(cards.Spades, cards.Three), // 4 discard
+			),
+			maxDisc:  3,
+			expected: []int{4},
+		},
+		{
+			name: "FourToStraight_DiscardOne",
+			hand: mk(
+				cards.NewCard(cards.Clubs, cards.Five),   // 0 keep
+				cards.NewCard(cards.Diamonds, cards.Six), // 1 keep
+				cards.NewCard(cards.Hearts, cards.Seven), // 2 keep
+				cards.NewCard(cards.Spades, cards.Eight), // 3 keep
+				cards.NewCard(cards.Clubs, cards.Two),    // 4 discard
+			),
+			maxDisc:  3,
+			expected: []int{4},
+		},
+		{
+			name: "ThreeOfKind_DiscardTwo",
+			hand: mk(
+				cards.NewCard(cards.Clubs, cards.Seven),    // 0 trip
+				cards.NewCard(cards.Diamonds, cards.Seven), // 1 trip
+				cards.NewCard(cards.Hearts, cards.Seven),   // 2 trip
+				cards.NewCard(cards.Spades, cards.King),    // 3 discard
+				cards.NewCard(cards.Clubs, cards.Queen),    // 4 discard
+			),
+			maxDisc:  3,
+			expected: []int{3, 4},
+		},
+		{
+			name: "TwoPair_DiscardKicker",
+			hand: mk(
+				cards.NewCard(cards.Clubs, cards.King),    // 0 pair
+				cards.NewCard(cards.Diamonds, cards.King), // 1 pair
+				cards.NewCard(cards.Hearts, cards.Nine),   // 2 pair
+				cards.NewCard(cards.Spades, cards.Nine),   // 3 pair
+				cards.NewCard(cards.Clubs, cards.Five),    // 4 kicker -> discard
+			),
+			maxDisc:  3,
+			expected: []int{4},
+		},
+		{
+			name: "OnePair_DiscardThree",
+			hand: mk(
+				cards.NewCard(cards.Clubs, cards.Jack),    // 0 pair
+				cards.NewCard(cards.Diamonds, cards.Jack), // 1 pair
+				cards.NewCard(cards.Hearts, cards.Ace),    // 2 discard
+				cards.NewCard(cards.Spades, cards.King),   // 3 discard
+				cards.NewCard(cards.Clubs, cards.Two),     // 4 discard
+			),
+			maxDisc:  3,
+			expected: []int{2, 3, 4},
+		},
+		{
+			name: "HighCard_DiscardUpToMax",
+			hand: mk(
+				cards.NewCard(cards.Clubs, cards.Two),      // 0 discard
+				cards.NewCard(cards.Diamonds, cards.Three), // 1 discard
+				cards.NewCard(cards.Hearts, cards.Four),    // 2 discard
+				cards.NewCard(cards.Clubs, cards.Nine),     // 3 keep
+				cards.NewCard(cards.Spades, cards.Ace),     // 4 keep (highest)
+			),
+			maxDisc:  3,
+			expected: []int{0, 1, 2},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RecommendDiscards(tc.hand, tc.maxDisc)
+			if tc.expected == nil {
+				assert.Nil(t, got, "%s: expected no discards", tc.name)
+			} else {
+				assert.ElementsMatch(t, tc.expected, got, "%s: unexpected discard indices", tc.name)
+				assert.LessOrEqual(t, len(got), tc.maxDisc, "%s: exceeded maxDiscard", tc.name)
+			}
+		})
+	}
+}
