@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,5 +92,176 @@ func TestPerformDraw_HighCardAggressive(t *testing.T) {
 		if i < len(discarded) {
 			assert.NotEqual(t, discarded[i], drew[i], "drawn card same as discarded")
 		}
+	}
+}
+
+func TestPrintCards(t *testing.T) {
+	// Capture stdout
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	cs := []cards.Card{
+		cards.NewCard(cards.Spades, cards.Ace),
+		cards.NewCard(cards.Hearts, cards.King),
+		cards.NewCard(cards.Diamonds, cards.Queen),
+	}
+	printCards(cs)
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	assert.Contains(t, output, "A♠", "output should contain Ace of Spades")
+	assert.Contains(t, output, "K♥", "output should contain King of Hearts")
+	assert.Contains(t, output, "Q♦", "output should contain Queen of Diamonds")
+}
+
+func TestPrintCardsEmpty(t *testing.T) {
+	// Capture stdout
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printCards([]cards.Card{})
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	assert.Equal(t, "\n", output, "empty card list should print only newline")
+}
+
+func TestPerformDrawDeckExhaustion(t *testing.T) {
+	d := deck.NewDeck()
+	// Deal most of the deck, leaving only 1 card
+	_, _ = d.Deal(51)
+	assert.Equal(t, 1, d.Len())
+
+	// Create a high-card hand that will want to discard 3+ cards
+	cs := []cards.Card{
+		cards.NewCard(cards.Clubs, cards.Two),
+		cards.NewCard(cards.Diamonds, cards.Three),
+		cards.NewCard(cards.Hearts, cards.Four),
+		cards.NewCard(cards.Spades, cards.Six),
+		cards.NewCard(cards.Clubs, cards.Seven),
+	}
+
+	// Try to draw 3 cards when only 1 remains
+	_, _, _, err := performDraw(d, cs, 3)
+	assert.Error(t, err, "should error when deck exhausted during draw")
+}
+
+func TestRun(t *testing.T) {
+	tests := []struct {
+		name        string
+		players     int
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "invalid player count zero",
+			players:     0,
+			expectError: true,
+			errorMsg:    "players must be > 0",
+		},
+		{
+			name:        "invalid player count negative",
+			players:     -1,
+			expectError: true,
+			errorMsg:    "players must be > 0",
+		},
+		{
+			name:        "too many players exhausts deck",
+			players:     15,
+			expectError: true,
+			errorMsg:    "deal error",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Capture stdout to suppress output during tests
+			old := os.Stdout
+			_, w, _ := os.Pipe()
+			os.Stdout = w
+
+			err := run(tc.players)
+
+			w.Close()
+			os.Stdout = old
+
+			if tc.expectError {
+				assert.Error(t, err, "expected error for %s", tc.name)
+				if tc.errorMsg != "" {
+					assert.Contains(t, err.Error(), tc.errorMsg, "error message mismatch")
+				}
+			} else {
+				assert.NoError(t, err, "unexpected error for %s", tc.name)
+			}
+		})
+	}
+}
+
+func TestRunSuccess(t *testing.T) {
+	// Capture stdout
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := run(2)
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	assert.NoError(t, err, "run should succeed with valid args")
+	assert.Contains(t, output, "Initial hands:", "output should contain initial hands")
+	assert.Contains(t, output, "Player 1:", "output should contain player 1")
+	assert.Contains(t, output, "Player 2:", "output should contain player 2")
+	assert.Contains(t, output, "Final hands:", "output should contain final hands")
+	assert.Regexp(t, "Winner: Player [12]|Result: Tie", output, "output should contain winner or tie")
+}
+
+func TestRunTieBetweenPlayers(t *testing.T) {
+	// This test is probabilistic since we use a shuffled deck
+	// Run multiple times to increase chance of seeing a tie
+	foundTie := false
+
+	for attempt := 0; attempt < 10 && !foundTie; attempt++ {
+		// Capture stdout
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := run(3)
+
+		w.Close()
+		os.Stdout = old
+
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
+		output := buf.String()
+
+		assert.NoError(t, err, "run should succeed")
+
+		if strings.Contains(output, "Result: Tie") {
+			foundTie = true
+			assert.Contains(t, output, "Result: Tie among players", "should contain tie message")
+			assert.Regexp(t, "Result: Tie among players( [0-9])+", output, "tie message should list player numbers")
+		}
+	}
+
+	if !foundTie {
+		t.Log("Note: No tie occurred in 10 attempts (expected with random shuffling)")
 	}
 }
