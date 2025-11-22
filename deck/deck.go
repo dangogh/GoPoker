@@ -7,10 +7,15 @@ import (
 	"github.com/dangogh/GoPoker/cards"
 )
 
+// Deck represents a mutable stack of playing cards.
+// It models a standard 52-card deck and supports dealing cards in order,
+// shuffling, inspecting length, and removing specific cards for test or gameplay purposes.
 type Deck struct {
 	cards []cards.Card
 }
 
+// NewDeck builds a new standard 52-card deck in a deterministic order
+// (Clubs -> Diamonds -> Hearts -> Spades; ranks Two -> Ace).
 func NewDeck() *Deck {
 	cs := make([]cards.Card, 0, 52)
 	for s := cards.Clubs; s <= cards.Spades; s++ {
@@ -21,6 +26,9 @@ func NewDeck() *Deck {
 	return &Deck{cards: cs}
 }
 
+// Shuffle randomly shuffles the remaining cards in the deck.
+// Note: randomness source is the package-level math/rand; callers/tests may seed or use a custom source
+// if deterministic behavior is required.
 func (d *Deck) Shuffle() {
 	rand.Shuffle(len(d.cards), func(i, j int) {
 		d.cards[i], d.cards[j] = d.cards[j], d.cards[i]
@@ -29,6 +37,8 @@ func (d *Deck) Shuffle() {
 
 func (d *Deck) Len() int { return len(d.cards) }
 
+// Deal removes and returns the next n cards from the deck (top of the deck).
+// Returns an error for negative n or if there aren't enough cards remaining.
 func (d *Deck) Deal(n int) ([]cards.Card, error) {
 	if n < 0 {
 		return nil, fmt.Errorf("negative deal count")
@@ -41,9 +51,9 @@ func (d *Deck) Deal(n int) ([]cards.Card, error) {
 	return hand, nil
 }
 
-// RemoveCards removes the first occurrence of each card in toRemove from the deck's remaining cards.
+// RemoveCards removes the first occurrences of the provided cards from the remaining deck.
 // It returns the number of cards actually removed.
-// Implementation: single-pass filtering using a frequency map and in-place slice reuse for efficiency.
+// This is useful in tests and advanced gameplay logic to ensure certain cards are not available.
 func (d *Deck) RemoveCards(toRemove []cards.Card) int {
 	if len(toRemove) == 0 || len(d.cards) == 0 {
 		return 0
