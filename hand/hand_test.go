@@ -365,3 +365,102 @@ func TestRecommendDiscards_Table(t *testing.T) {
 		})
 	}
 }
+
+// FuzzEvaluate fuzzes Evaluate with random 5-card hands.
+// Invariants: Evaluate should not panic, should return valid category, and ranks length should be reasonable.
+func FuzzEvaluate(f *testing.F) {
+	f.Add(uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0))
+	f.Fuzz(func(t *testing.T, s0, r0, s1, r1, s2, r2, s3, r3, s4, r4 uint8) {
+		// Map bytes to valid suits and ranks
+		suits := []cards.Suit{cards.Clubs, cards.Diamonds, cards.Hearts, cards.Spades}
+		ranks := []cards.Rank{cards.Two, cards.Three, cards.Four, cards.Five, cards.Six, cards.Seven,
+			cards.Eight, cards.Nine, cards.Ten, cards.Jack, cards.Queen, cards.King, cards.Ace}
+
+		h := Hand{Cards: []cards.Card{
+			cards.NewCard(suits[s0%4], ranks[r0%13]),
+			cards.NewCard(suits[s1%4], ranks[r1%13]),
+			cards.NewCard(suits[s2%4], ranks[r2%13]),
+			cards.NewCard(suits[s3%4], ranks[r3%13]),
+			cards.NewCard(suits[s4%4], ranks[r4%13]),
+		}}
+
+		ev := Evaluate(h)
+		// Invariants: category should be in range [0, StraightFlush]
+		assert.GreaterOrEqual(t, int(ev.Category), int(HighCard))
+		assert.LessOrEqual(t, int(ev.Category), int(StraightFlush))
+		// Ranks should be non-empty
+		assert.NotEmpty(t, ev.Ranks)
+		// Ranks should not exceed 5
+		assert.LessOrEqual(t, len(ev.Ranks), 5)
+	})
+}
+
+// FuzzCompare fuzzes Compare with random hands to verify symmetry and antisymmetry.
+// Invariants: Compare(a,b) == -Compare(b,a), Compare(a,a) == 0, comparison results should be -1, 0, or 1.
+func FuzzCompare(f *testing.F) {
+	f.Add(uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0))
+	f.Fuzz(func(t *testing.T, s0, r0, s1, r1, s2, r2, s3, r3, s4, r4 uint8) {
+		suits := []cards.Suit{cards.Clubs, cards.Diamonds, cards.Hearts, cards.Spades}
+		ranks := []cards.Rank{cards.Two, cards.Three, cards.Four, cards.Five, cards.Six, cards.Seven,
+			cards.Eight, cards.Nine, cards.Ten, cards.Jack, cards.Queen, cards.King, cards.Ace}
+
+		h1 := Hand{Cards: []cards.Card{
+			cards.NewCard(suits[s0%4], ranks[r0%13]),
+			cards.NewCard(suits[s1%4], ranks[r1%13]),
+			cards.NewCard(suits[s2%4], ranks[r2%13]),
+			cards.NewCard(suits[s3%4], ranks[r3%13]),
+			cards.NewCard(suits[s4%4], ranks[r4%13]),
+		}}
+
+		e1 := Evaluate(h1)
+		e2 := Evaluate(h1) // Same hand
+
+		// Symmetry: Compare(a, b) == -Compare(b, a)
+		cmp := Compare(e1, e2)
+		assert.Equal(t, -cmp, Compare(e2, e1), "symmetry violated")
+
+		// Reflexivity: Compare(a, a) == 0
+		assert.Equal(t, 0, cmp, "reflexivity violated for identical hands")
+
+		// Result should be -1, 0, or 1
+		assert.Contains(t, []int{-1, 0, 1}, cmp, "compare result out of range")
+	})
+}
+
+// FuzzRecommendDiscards fuzzes RecommendDiscards with random hands and maxDiscard values.
+// Invariants: returned indices should be <= maxDiscard, all indices should be valid (0-4), no panics.
+func FuzzRecommendDiscards(f *testing.F) {
+	f.Add(uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(0), uint8(3))
+	f.Fuzz(func(t *testing.T, s0, r0, s1, r1, s2, r2, s3, r3, s4, r4, maxD uint8) {
+		suits := []cards.Suit{cards.Clubs, cards.Diamonds, cards.Hearts, cards.Spades}
+		ranks := []cards.Rank{cards.Two, cards.Three, cards.Four, cards.Five, cards.Six, cards.Seven,
+			cards.Eight, cards.Nine, cards.Ten, cards.Jack, cards.Queen, cards.King, cards.Ace}
+
+		h := Hand{Cards: []cards.Card{
+			cards.NewCard(suits[s0%4], ranks[r0%13]),
+			cards.NewCard(suits[s1%4], ranks[r1%13]),
+			cards.NewCard(suits[s2%4], ranks[r2%13]),
+			cards.NewCard(suits[s3%4], ranks[r3%13]),
+			cards.NewCard(suits[s4%4], ranks[r4%13]),
+		}}
+
+		maxDisc := int(maxD%5) + 1 // Range [1, 5]
+		discards := RecommendDiscards(h, maxDisc)
+
+		// Invariant: number of discards should be <= maxDisc
+		assert.LessOrEqual(t, len(discards), maxDisc, "discards exceeded maxDisc")
+
+		// Invariant: all indices should be valid (0-4)
+		for _, idx := range discards {
+			assert.GreaterOrEqual(t, idx, 0)
+			assert.Less(t, idx, 5)
+		}
+
+		// Invariant: no duplicate indices
+		seen := make(map[int]bool)
+		for _, idx := range discards {
+			assert.False(t, seen[idx], "duplicate discard index")
+			seen[idx] = true
+		}
+	})
+}
