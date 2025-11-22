@@ -366,6 +366,106 @@ func TestRecommendDiscards_Table(t *testing.T) {
 	}
 }
 
+func TestCategoryString(t *testing.T) {
+	tests := []struct {
+		category Category
+		expected string
+	}{
+		{HighCard, "High Card"},
+		{OnePair, "One Pair"},
+		{TwoPair, "Two Pair"},
+		{ThreeOfKind, "Three of a Kind"},
+		{Straight, "Straight"},
+		{Flush, "Flush"},
+		{FullHouse, "Full House"},
+		{FourOfKind, "Four of a Kind"},
+		{StraightFlush, "Straight Flush"},
+		{Category(99), "Category(99)"}, // Unknown category
+	}
+	for _, tc := range tests {
+		assert.Equal(t, tc.expected, tc.category.String())
+	}
+}
+
+func TestEvaluateWheelStraightFlush(t *testing.T) {
+	h := mk(
+		cards.NewCard(cards.Clubs, cards.Ace),
+		cards.NewCard(cards.Clubs, cards.Two),
+		cards.NewCard(cards.Clubs, cards.Three),
+		cards.NewCard(cards.Clubs, cards.Four),
+		cards.NewCard(cards.Clubs, cards.Five),
+	)
+	ev := Evaluate(h)
+	assert.Equal(t, StraightFlush, ev.Category)
+	assert.Equal(t, []cards.Rank{cards.Five}, ev.Ranks)
+}
+
+func TestCompareLongerRanksList(t *testing.T) {
+	// Test rare case where rank lists have different lengths
+	a := EvaluatedHand{Category: HighCard, Ranks: []cards.Rank{cards.Ace, cards.King, cards.Queen}}
+	b := EvaluatedHand{Category: HighCard, Ranks: []cards.Rank{cards.Ace, cards.King}}
+	assert.Equal(t, 1, Compare(a, b))
+	assert.Equal(t, -1, Compare(b, a))
+}
+
+func TestRecommendDiscardsEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		hand     Hand
+		maxDisc  int
+		expected []int
+	}{
+		{
+			name:     "maxDiscard zero",
+			hand:     mk(cards.NewCard(cards.Clubs, cards.Two), cards.NewCard(cards.Diamonds, cards.Three), cards.NewCard(cards.Hearts, cards.Four), cards.NewCard(cards.Spades, cards.Five), cards.NewCard(cards.Clubs, cards.Six)),
+			maxDisc:  0,
+			expected: nil,
+		},
+		{
+			name:     "empty hand",
+			hand:     Hand{Cards: []cards.Card{}},
+			maxDisc:  3,
+			expected: nil,
+		},
+		{
+			name: "ThreeOfKind exceeds maxDiscard",
+			hand: mk(
+				cards.NewCard(cards.Clubs, cards.Seven),
+				cards.NewCard(cards.Diamonds, cards.Seven),
+				cards.NewCard(cards.Hearts, cards.Seven),
+				cards.NewCard(cards.Spades, cards.King),
+				cards.NewCard(cards.Clubs, cards.Queen),
+			),
+			maxDisc:  1,
+			expected: []int{4}, // Only discard Queen (lowest)
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RecommendDiscards(tc.hand, tc.maxDisc)
+			if tc.expected == nil {
+				assert.Nil(t, got)
+			} else {
+				expectedCards := make([]string, len(tc.expected))
+				for i, idx := range tc.expected {
+					expectedCards[i] = tc.hand.Cards[idx].String()
+				}
+				gotCards := make([]string, len(got))
+				for i, idx := range got {
+					gotCards[i] = tc.hand.Cards[idx].String()
+				}
+				assert.ElementsMatch(t, expectedCards, gotCards)
+			}
+		})
+	}
+}
+
+func TestComputeMaxDiscardEmptyHand(t *testing.T) {
+	h := Hand{Cards: []cards.Card{}}
+	assert.Equal(t, 3, ComputeMaxDiscard(h))
+}
+
 // FuzzEvaluate fuzzes Evaluate with random 5-card hands.
 // Invariants: Evaluate should not panic, should return valid category, and ranks length should be reasonable.
 func FuzzEvaluate(f *testing.F) {
