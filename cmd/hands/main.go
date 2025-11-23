@@ -134,7 +134,7 @@ func run(players int) error {
 
 	// Evaluate final hands and find winner(s)
 	evals := make([]hand.EvaluatedHand, players)
-	for i := 0; i < players; i++ {
+	for i := range players {
 		h := hand.Hand{Cards: hands[i]}
 		evals[i] = hand.Evaluate(h)
 	}
