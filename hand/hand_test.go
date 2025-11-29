@@ -10,18 +10,6 @@ import (
 
 func mk(cs ...cards.Card) Hand { return Hand{Cards: cs} }
 
-// cardStrings converts card indices to their string representation for assertion messages.
-func cardStrings(hand Hand, indices []int) []string {
-	if indices == nil {
-		return nil
-	}
-	strs := make([]string, len(indices))
-	for i, idx := range indices {
-		strs[i] = hand.Cards[idx].String()
-	}
-	return strs
-}
-
 func TestEvaluateCategories(t *testing.T) {
 	tests := []struct {
 		name     string
