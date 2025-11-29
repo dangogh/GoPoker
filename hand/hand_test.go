@@ -1,6 +1,7 @@
 package hand
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,16 @@ import (
 )
 
 func mk(cs ...cards.Card) Hand { return Hand{Cards: cs} }
+
+// shuffle returns a new hand with cards in random order
+func shuffle(cs ...cards.Card) Hand {
+	shuffled := make([]cards.Card, len(cs))
+	copy(shuffled, cs)
+	rand.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+	return Hand{Cards: shuffled}
+}
 
 func TestEvaluateCategories(t *testing.T) {
 	tests := []struct {
@@ -19,7 +30,7 @@ func TestEvaluateCategories(t *testing.T) {
 	}{
 		{
 			name: "StraightFlush A-high",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Spades, cards.Ten),
 				cards.NewCard(cards.Spades, cards.Jack),
 				cards.NewCard(cards.Spades, cards.Queen),
@@ -31,7 +42,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "Four of a kind",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.King),
 				cards.NewCard(cards.Diamonds, cards.King),
 				cards.NewCard(cards.Hearts, cards.King),
@@ -43,7 +54,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "Full House",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.Three),
 				cards.NewCard(cards.Diamonds, cards.Three),
 				cards.NewCard(cards.Hearts, cards.Three),
@@ -55,7 +66,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "Flush",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Hearts, cards.Ace),
 				cards.NewCard(cards.Hearts, cards.King),
 				cards.NewCard(cards.Hearts, cards.Nine),
@@ -67,7 +78,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "Straight normal",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.Six),
 				cards.NewCard(cards.Diamonds, cards.Seven),
 				cards.NewCard(cards.Hearts, cards.Eight),
@@ -79,7 +90,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "Wheel straight A-2-3-4-5",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.Ace),
 				cards.NewCard(cards.Diamonds, cards.Two),
 				cards.NewCard(cards.Hearts, cards.Three),
@@ -91,7 +102,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "Three of a kind",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.Seven),
 				cards.NewCard(cards.Diamonds, cards.Seven),
 				cards.NewCard(cards.Hearts, cards.Seven),
@@ -103,7 +114,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "Two Pair",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.King),
 				cards.NewCard(cards.Diamonds, cards.King),
 				cards.NewCard(cards.Hearts, cards.Nine),
@@ -115,7 +126,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "One Pair",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.Jack),
 				cards.NewCard(cards.Diamonds, cards.Jack),
 				cards.NewCard(cards.Hearts, cards.Ace),
@@ -127,7 +138,7 @@ func TestEvaluateCategories(t *testing.T) {
 		},
 		{
 			name: "High Card",
-			hand: mk(
+			hand: shuffle(
 				cards.NewCard(cards.Clubs, cards.Ace),
 				cards.NewCard(cards.Diamonds, cards.King),
 				cards.NewCard(cards.Hearts, cards.Nine),
@@ -150,14 +161,14 @@ func TestEvaluateCategories(t *testing.T) {
 
 func TestCompareBasics(t *testing.T) {
 	// Four of a kind beats full house
-	four := Evaluate(mk(
+	four := Evaluate(shuffle(
 		cards.NewCard(cards.Clubs, cards.King),
 		cards.NewCard(cards.Diamonds, cards.King),
 		cards.NewCard(cards.Hearts, cards.King),
 		cards.NewCard(cards.Spades, cards.King),
 		cards.NewCard(cards.Clubs, cards.Ace),
 	))
-	full := Evaluate(mk(
+	full := Evaluate(shuffle(
 		cards.NewCard(cards.Clubs, cards.Three),
 		cards.NewCard(cards.Diamonds, cards.Three),
 		cards.NewCard(cards.Hearts, cards.Three),
@@ -167,14 +178,14 @@ func TestCompareBasics(t *testing.T) {
 	assert.Equal(t, 1, Compare(four, full), "four should beat full")
 
 	// Straight top-rank comparison
-	s1 := Evaluate(mk(
+	s1 := Evaluate(shuffle(
 		cards.NewCard(cards.Clubs, cards.Six),
 		cards.NewCard(cards.Diamonds, cards.Seven),
 		cards.NewCard(cards.Hearts, cards.Eight),
 		cards.NewCard(cards.Spades, cards.Nine),
 		cards.NewCard(cards.Clubs, cards.Ten),
 	))
-	s2 := Evaluate(mk(
+	s2 := Evaluate(shuffle(
 		cards.NewCard(cards.Clubs, cards.Five),
 		cards.NewCard(cards.Diamonds, cards.Six),
 		cards.NewCard(cards.Hearts, cards.Seven),
@@ -184,14 +195,14 @@ func TestCompareBasics(t *testing.T) {
 	assert.Equal(t, 1, Compare(s1, s2), "higher straight should win")
 
 	// Same hands compare equal and symmetry holds
-	h1 := Evaluate(mk(
+	h1 := Evaluate(shuffle(
 		cards.NewCard(cards.Clubs, cards.Ace),
 		cards.NewCard(cards.Diamonds, cards.King),
 		cards.NewCard(cards.Hearts, cards.Nine),
 		cards.NewCard(cards.Spades, cards.Five),
 		cards.NewCard(cards.Clubs, cards.Two),
 	))
-	h2 := Evaluate(mk(
+	h2 := Evaluate(shuffle(
 		cards.NewCard(cards.Hearts, cards.Ace),
 		cards.NewCard(cards.Spades, cards.King),
 		cards.NewCard(cards.Diamonds, cards.Nine),
@@ -376,7 +387,7 @@ func TestCategoryString(t *testing.T) {
 }
 
 func TestEvaluateWheelStraightFlush(t *testing.T) {
-	h := mk(
+	h := shuffle(
 		cards.NewCard(cards.Clubs, cards.Ace),
 		cards.NewCard(cards.Clubs, cards.Two),
 		cards.NewCard(cards.Clubs, cards.Three),
