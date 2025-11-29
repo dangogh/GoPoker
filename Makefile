@@ -1,10 +1,12 @@
-.PHONY: test cover clean
+.PHONY: all test cover clean
 
 test:
-	go test ./... -coverprofile=coverage.out
+	go test -coverprofile=coverage.out ./...
+
 
 cover: test
 	go tool cover -html=coverage.out
 
+
 clean:
-	rm -f coverage.out
+	rm -rf coverage.out
