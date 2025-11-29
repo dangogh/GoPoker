@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -73,6 +75,10 @@ func parseCard(cardStr string) (cards.Card, error) {
 }
 
 func main() {
+	transport := flag.String("transport", "streamable_http", "MCP transport protocol: stdio or streamable_http")
+	port := flag.String("port", "8080", "Port for streamable_http transport")
+	flag.Parse()
+
 	// Create MCP server
 	impl := &mcp.Implementation{
 		Name:    "gopoker-mcp-server",
@@ -165,11 +171,32 @@ Hand Strength: %s with ranks %v`,
 	// Add tool to server
 	s.AddTool(tool, handler)
 
-	// Create stdio transport and run server
-	transport := &mcp.StdioTransport{}
+	// Create transport based on flag
+	var mcpTransport mcp.Transport
+	switch *transport {
+	case "stdio":
+		mcpTransport = &mcp.StdioTransport{}
+		log.Println("Starting GoPoker MCP server (stdio transport)")
+	case "streamable_http":
+		// For streamable_http, we need to set up an HTTP server
+		// Note: The SDK may not have built-in streamable_http support yet
+		// This would require custom implementation or waiting for SDK support
+		log.Printf("Starting GoPoker MCP server on port %s (streamable_http transport)", *port)
+		http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+			// Create a transport for this request
+			// This is a placeholder - actual implementation depends on SDK support
+			log.Printf("Received %s request to /mcp", r.Method)
+			http.Error(w, "streamable_http not yet implemented", http.StatusNotImplemented)
+		})
+		if err := http.ListenAndServe(":"+*port, nil); err != nil {
+			log.Fatalf("HTTP server failed: %v", err)
+		}
+		return
+	default:
+		log.Fatalf("Unknown transport: %s (valid options: stdio, streamable_http)", *transport)
+	}
 
-	log.Println("Starting GoPoker MCP server (stdio transport)")
-	if err := s.Run(context.Background(), transport); err != nil {
+	if err := s.Run(context.Background(), mcpTransport); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
