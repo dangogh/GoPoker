@@ -75,7 +75,7 @@ func parseCard(cardStr string) (cards.Card, error) {
 }
 
 func main() {
-	transport := flag.String("transport", "streamable_http", "MCP transport protocol: stdio or streamable_http")
+	transport := flag.String("transport", "stdio", "MCP transport protocol: stdio or streamable_http")
 	port := flag.String("port", "8080", "Port for streamable_http transport")
 	flag.Parse()
 
@@ -177,21 +177,52 @@ Hand Strength: %s with ranks %v`,
 	case "stdio":
 		mcpTransport = &mcp.StdioTransport{}
 		log.Println("Starting GoPoker MCP server (stdio transport)")
+		
 	case "streamable_http":
-		// For streamable_http, we need to set up an HTTP server
-		// Note: The SDK may not have built-in streamable_http support yet
-		// This would require custom implementation or waiting for SDK support
+		// For streamable_http, we need to create a custom HTTP server
+		// that handles MCP protocol over HTTP with chunked transfer
 		log.Printf("Starting GoPoker MCP server on port %s (streamable_http transport)", *port)
+		
 		http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
-			// Create a transport for this request
-			// This is a placeholder - actual implementation depends on SDK support
-			log.Printf("Received %s request to /mcp", r.Method)
-			http.Error(w, "streamable_http not yet implemented", http.StatusNotImplemented)
+			if r.Method != http.MethodPost {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			// Set headers for chunked streaming
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Transfer-Encoding", "chunked")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+
+			// Create an IOTransport for this request
+			transport := &mcp.IOTransport{
+				Reader: r.Body,
+				Writer: &httpChunkWriter{w: w},
+			}
+
+			// Connect the server for this request
+			ctx := r.Context()
+			_, err := s.Connect(ctx, transport, nil)
+			if err != nil {
+				log.Printf("Connection error: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// The connection will be handled by the transport
 		})
+
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintln(w, "OK")
+		})
+
 		if err := http.ListenAndServe(":"+*port, nil); err != nil {
 			log.Fatalf("HTTP server failed: %v", err)
 		}
 		return
+		
 	default:
 		log.Fatalf("Unknown transport: %s (valid options: stdio, streamable_http)", *transport)
 	}
@@ -199,4 +230,21 @@ Hand Strength: %s with ranks %v`,
 	if err := s.Run(context.Background(), mcpTransport); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+// httpChunkWriter wraps http.ResponseWriter to flush after each write
+type httpChunkWriter struct {
+	w http.ResponseWriter
+}
+
+func (h *httpChunkWriter) Write(p []byte) (n int, err error) {
+	n, err = h.w.Write(p)
+	if f, ok := h.w.(http.Flusher); ok {
+		f.Flush()
+	}
+	return n, err
+}
+
+func (h *httpChunkWriter) Close() error {
+	return nil
 }
