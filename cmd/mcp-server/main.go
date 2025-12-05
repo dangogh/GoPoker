@@ -240,7 +240,9 @@ Hand Strength: %s with ranks %v`,
 			fmt.Fprintln(w, "OK")
 		})
 
-		if err := http.ListenAndServe(":"+*port, nil); err != nil {
+		// Bind to all interfaces for remote access
+		addr := "0.0.0.0:" + *port
+		if err := http.ListenAndServe(addr, nil); err != nil {
 			log.Fatalf("HTTP server failed: %v", err)
 		}
 
