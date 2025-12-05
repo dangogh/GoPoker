@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -89,7 +91,7 @@ func main() {
 		Instructions: "Poker hand evaluation server for 5-card draw",
 	})
 
-	// Define the tool
+	// Define and add the tool
 	tool := &mcp.Tool{
 		Name:        "evaluate_poker_hand",
 		Description: "Evaluate a 5-card poker hand and get recommended discards for 5-card draw. Returns the hand category (e.g., Pair, Flush, Full House) and suggests which cards to discard to improve the hand. Each card is a string with rank and suit separated by space (e.g., 'A spades', 'K hearts', '10 clubs').",
@@ -112,11 +114,10 @@ func main() {
 		},
 	}
 
-	// Handler function
 	handler := func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var params EvaluateHandParams
 		if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
-			return nil, fmt.Errorf("invalid arguments: %w", err)
+			return nil, err
 		}
 
 		if len(params.Cards) != 5 {
@@ -168,49 +169,70 @@ Hand Strength: %s with ranks %v`,
 		}, nil
 	}
 
-	// Add tool to server
 	s.AddTool(tool, handler)
 
 	// Create transport based on flag
-	var mcpTransport mcp.Transport
 	switch *transport {
 	case "stdio":
-		mcpTransport = &mcp.StdioTransport{}
+		mcpTransport := &mcp.StdioTransport{}
 		log.Println("Starting GoPoker MCP server (stdio transport)")
-		
+		if err := s.Run(context.Background(), mcpTransport); err != nil {
+			log.Fatalf("Server failed: %v", err)
+		}
+
 	case "streamable_http":
-		// For streamable_http, we need to create a custom HTTP server
-		// that handles MCP protocol over HTTP with chunked transfer
 		log.Printf("Starting GoPoker MCP server on port %s (streamable_http transport)", *port)
-		
+
+		// Track active sessions
+		sessions := &sessionManager{
+			sessions: make(map[string]*sessionInfo),
+		}
+
 		http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
-			// Set headers for chunked streaming
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Transfer-Encoding", "chunked")
-			w.Header().Set("Cache-Control", "no-cache")
-			w.Header().Set("Connection", "keep-alive")
-
-			// Create an IOTransport for this request
-			transport := &mcp.IOTransport{
-				Reader: r.Body,
-				Writer: &httpChunkWriter{w: w},
+			// Get or create session ID
+			sessionID := r.Header.Get("Mcp-Session-Id")
+			if sessionID == "" {
+				// New session
+				sessionID = sessions.newSession()
+				log.Printf("New session: %s", sessionID)
 			}
 
-			// Connect the server for this request
+			// Set response headers
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Mcp-Session-Id", sessionID)
+			w.Header().Set("Cache-Control", "no-cache")
+
+			// Create a bidirectional pipe for this request
+			pr, pw := io.Pipe()
+
+			// Wrap the response writer to capture writes
+			respWriter := &responseCapture{
+				ResponseWriter: w,
+				pipe:           pw,
+			}
+
+			// Create IOTransport for this request/response
+			transport := &mcp.IOTransport{
+				Reader: r.Body,
+				Writer: respWriter,
+			}
+
+			// Handle the connection
 			ctx := r.Context()
 			_, err := s.Connect(ctx, transport, nil)
 			if err != nil {
-				log.Printf("Connection error: %v", err)
+				log.Printf("Connection error for session %s: %v", sessionID, err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			// The connection will be handled by the transport
+			// Read from pipe and write to response
+			io.Copy(w, pr)
 		})
 
 		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -221,30 +243,66 @@ Hand Strength: %s with ranks %v`,
 		if err := http.ListenAndServe(":"+*port, nil); err != nil {
 			log.Fatalf("HTTP server failed: %v", err)
 		}
-		return
-		
+
 	default:
 		log.Fatalf("Unknown transport: %s (valid options: stdio, streamable_http)", *transport)
 	}
+}
 
-	if err := s.Run(context.Background(), mcpTransport); err != nil {
-		log.Fatalf("Server failed: %v", err)
+// responseCapture captures writes and pipes them through for streaming
+type responseCapture struct {
+	http.ResponseWriter
+	pipe *io.PipeWriter
+	once sync.Once
+}
+
+func (r *responseCapture) Write(p []byte) (n int, err error) {
+	// Write to both the HTTP response and the pipe
+	n, err = r.ResponseWriter.Write(p)
+	if err != nil {
+		return n, err
 	}
-}
 
-// httpChunkWriter wraps http.ResponseWriter to flush after each write
-type httpChunkWriter struct {
-	w http.ResponseWriter
-}
-
-func (h *httpChunkWriter) Write(p []byte) (n int, err error) {
-	n, err = h.w.Write(p)
-	if f, ok := h.w.(http.Flusher); ok {
+	// Flush if possible
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+
+	// Also write to pipe for coordination
+	r.pipe.Write(p)
+
 	return n, err
 }
 
-func (h *httpChunkWriter) Close() error {
+func (r *responseCapture) Close() error {
+	r.once.Do(func() {
+		r.pipe.Close()
+	})
 	return nil
+}
+
+// sessionManager tracks active MCP sessions
+type sessionManager struct {
+	mu       sync.Mutex
+	sessions map[string]*sessionInfo
+	counter  int
+}
+
+type sessionInfo struct {
+	id      string
+	created int64
+}
+
+func (sm *sessionManager) newSession() string {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	sm.counter++
+	id := fmt.Sprintf("session-%d", sm.counter)
+	sm.sessions[id] = &sessionInfo{
+		id:      id,
+		created: 0, // Could use time.Now().Unix()
+	}
+
+	return id
 }
